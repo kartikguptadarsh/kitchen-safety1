@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>School Safety Dashboard</title>
+    <style>
+        :root { --bg: #f0f2f5; --card: #ffffff; --primary: #d32f2f; --safe: #388e3c; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; align-items: center; }
+        .header { background: #1a1a1b; color: white; width: 100%; padding: 20px; text-align: center; font-size: 1.2em; font-weight: bold; }
+        .container { width: 90%; max-width: 500px; margin-top: 20px; }
+        .card { background: var(--card); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        .label { color: #5f6368; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 2.5em; font-weight: bold; margin: 10px 0; transition: color 0.3s ease; }
+        .safe { color: var(--safe); }
+        .danger { color: var(--primary); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div class="header">SCHOOL KITCHEN MONITOR</div>
+
+    <div class="container">
+        <div class="card">
+            <div class="label">Gas Concentration</div>
+            <div id="gasDisplay" class="value safe">--</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Fire Safety Status</div>
+            <div id="fireDisplay" class="value safe">CONNECTING</div>
+        </div>
+    </div>
+
+    <script>
+        const token = "-72u75kO1HKgqwvWgHqB2icaD3ocOhtX";
+
+       async function updateStats() {
+    // Use the 'query' endpoint which is more browser-friendly
+    const baseUrl = `https://blynk.cloud/external/api/get?token=${token}`;
+
+    try {
+        // Fetch Gas (V1)
+        const gRes = await fetch(`${baseUrl}&v1`);
+        const gas = await gRes.text();
+        const gEl = document.getElementById('gasDisplay');
+        gEl.innerText = gas.trim();
+        gEl.className = (parseInt(gas) > 2800) ? "value danger" : "value safe";
+
+        // Fetch Fire (V0)
+        const fRes = await fetch(`${baseUrl}&v0`);
+        const fire = await fRes.text();
+        const fEl = document.getElementById('fireDisplay');
+        if(fire.trim() === "1") {
+            fEl.innerText = "🔥 FIRE!";
+            fEl.className = "value danger";
+        } else {
+            fEl.innerText = "SAFE";
+            fEl.className = "value safe";
+        }
+    } catch (err) { 
+        console.log("Connection Error: Check your internet or Token"); 
+    }
+}
+        setInterval(updateStats, 3000);
+    </script>
+</body>
+</html>
