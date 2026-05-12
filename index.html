@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>(function(w,d, s, id) {if(typeof(w.webpushr)!=='undefined') return;w.webpushr=w.webpushr||function(){(w.webpushr.q=w.webpushr.q||[]).push(arguments)};var js, fjs = d.getElementsByTagName(s)[0];js = d.createElement(s); js.id = id;js.async=1;js.src = "https://cdn.webpushr.com/app.min.js";fjs.parentNode.appendChild(js);}(window,document, 'script', 'webpushr-jssdk'));webpushr('setup',{'key':'BI9sq9eioTZHXP-3rk-jbk79rNg9iiQ0M6zC1Qo4Pvxj9mZczsRY8mjD-wmC15NzTSyjkXmN_oatzpql02TrnhU' });</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="manifest.json">
-    <title>School Safety Dashboard</title>
+    <title>School Safety Monitor</title>
     <style>
-        :root { --bg: #f0f2f5; --card: #ffffff; --primary: #d32f2f; --safe: #388e3c; }
+        :root { --bg: #f4f7f6; --card: #ffffff; --danger: #e74c3c; --safe: #2ecc71; --header: #2c3e50; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; align-items: center; }
-        .header { background: #1a1a1b; color: white; width: 100%; padding: 20px; text-align: center; font-size: 1.2em; font-weight: bold; }
-        .container { width: 90%; max-width: 500px; margin-top: 20px; }
-        .card { background: var(--card); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
-        .label { color: #5f6368; font-size: 0.9em; text-transform: uppercase; letter-spacing: 1px; }
-        .value { font-size: 2.5em; font-weight: bold; margin: 10px 0; transition: color 0.3s ease; }
+        .header { background: var(--header); color: white; width: 100%; padding: 20px; text-align: center; font-weight: bold; font-size: 1.4em; }
+        .container { width: 95%; max-width: 500px; margin-top: 20px; }
+        .card { background: var(--card); border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); text-align: center; }
+        .label { color: #7f8c8d; font-size: 0.8em; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+        .value { font-size: 3em; font-weight: bold; transition: all 0.3s ease; }
+        .status { font-size: 1.5em; font-weight: bold; margin-top: 10px; }
         .safe { color: var(--safe); }
-        .danger { color: var(--primary); animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .danger { color: var(--danger); animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -24,47 +26,93 @@
 
     <div class="container">
         <div class="card">
-            <div class="label">Gas Concentration</div>
+            <div class="label">LPG Concentration (V1)</div>
             <div id="gasDisplay" class="value safe">--</div>
         </div>
 
         <div class="card">
-            <div class="label">Fire Safety Status</div>
-            <div id="fireDisplay" class="value safe">CONNECTING</div>
+            <div class="label">Fire Safety (V2)</div>
+            <div id="fireStatus" class="status safe">LOADING...</div>
+        </div>
+
+        <div class="card">
+            <div class="label">Cooking Timer (V3)</div>
+            <div id="timerStatus" class="status safe">READY</div>
         </div>
     </div>
 
     <script>
         const token = "-72u75kO1HKgqwvWgHqB2icaD3ocOhtX";
+        const apiBase = `https://blynk.cloud/external/api/get?token=${token}`;
+        
+        // Alert tracking to prevent notification spam
+        let gasAlertSent = false;
+        let fireAlertSent = false;
 
-       async function updateStats() {
-    // Use the 'query' endpoint which is more browser-friendly
-    const baseUrl = `https://blynk.cloud/external/api/get?token=${token}`;
+        async function updateDashboard() {
+            try {
+                // 1. Fetch Gas (V1)
+                const gRes = await fetch(`${apiBase}&v1`);
+                const gasVal = parseInt(await gRes.text());
+                const gEl = document.getElementById('gasDisplay');
+                gEl.innerText = gasVal;
+                
+                if (gasVal > 2800) {
+                    gEl.className = "value danger";
+                    if (!gasAlertSent) {
+                        sendPush("⚠️ GAS LEAK", `High concentration detected: ${gasVal}`);
+                        gasAlertSent = true;
+                    }
+                } else {
+                    gEl.className = "value safe";
+                    gasAlertSent = false;
+                }
 
-    try {
-        // Fetch Gas (V1)
-        const gRes = await fetch(`${baseUrl}&v1`);
-        const gas = await gRes.text();
-        const gEl = document.getElementById('gasDisplay');
-        gEl.innerText = gas.trim();
-        gEl.className = (parseInt(gas) > 2800) ? "value danger" : "value safe";
+                // 2. Fetch Fire Alert (V2)
+                const fRes = await fetch(`${apiBase}&v2`);
+                const fireVal = (await fRes.text()).trim();
+                const fEl = document.getElementById('fireStatus');
+                
+                if (fireVal === "1") {
+                    fEl.innerText = "⚠️ FIRE DETECTED";
+                    fEl.className = "status danger";
+                    if (!fireAlertSent) {
+                        sendPush("🔥 FIRE ALERT", "Flame detected in the kitchen!");
+                        fireAlertSent = true;
+                    }
+                } else {
+                    fEl.innerText = "✅ SYSTEM SECURE";
+                    fEl.className = "status safe";
+                    fireAlertSent = false;
+                }
 
-        // Fetch Fire (V0)
-        const fRes = await fetch(`${baseUrl}&v0`);
-        const fire = await fRes.text();
-        const fEl = document.getElementById('fireDisplay');
-        if(fire.trim() === "1") {
-            fEl.innerText = "🔥 FIRE!";
-            fEl.className = "value danger";
-        } else {
-            fEl.innerText = "SAFE";
-            fEl.className = "value safe";
+                // 3. Fetch Timer Finish (V3)
+                const tRes = await fetch(`${apiBase}&v3`);
+                const timerVal = (await tRes.text()).trim();
+                const tEl = document.getElementById('timerStatus');
+                tEl.innerText = (timerVal === "1") ? "⏰ TIME UP!" : "READY";
+                tEl.className = (timerVal === "1") ? "status danger" : "status safe";
+
+            } catch (err) {
+                console.log("Sync Error: Check Internet/Token");
+            }
         }
-    } catch (err) { 
-        console.log("Connection Error: Check your internet or Token"); 
-    }
-}
-        setInterval(updateStats, 3000);
+
+        function sendPush(title, message) {
+            if (typeof webpushr !== 'undefined') {
+                webpushr('action', 'custom_notification', {
+                    title: title,
+                    message: message,
+                    target_url: window.location.href
+                });
+            }
+        }
+
+        setInterval(updateDashboard, 3000); 
+        
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
     </script>
 </body>
 </html>
