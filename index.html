@@ -42,94 +42,58 @@
     </div>
 
     <script>
-        const token = "-72u75kO1HKgqwvWgHqB2icaD3ocOhtX";
-        const apiBase = `https://blynk.cloud/external/api/get?token=${token}`;
-        
-        // Alert tracking to prevent notification spam
-        let gasAlertSent = false;
-        let fireAlertSent = false;
-        let timerAlertSent = false;
+// Replace your entire <script> section with this
+const token = "-72u75kO1HKgqwvWgHqB2icaD3ocOhtX";
+const apiBase = `https://blynk.cloud/external/api/get?token=${token}`;
 
-        async function updateDashboard() {
-            try {
-                // 1. Fetch Gas (V1)
-                const gRes = await fetch(`${apiBase}&v1`);
-                const gasVal = parseInt(await gRes.text());
-                const gEl = document.getElementById('gasDisplay');
-                gEl.innerText = gasVal;
-                
-                if (gasVal > 2800) {
-                    gEl.className = "value danger";
-                    if (!gasAlertSent) {
-                        sendPush("⚠️ GAS LEAK", `High concentration detected: ${gasVal}`);
-                        gasAlertSent = true;
-                    }
-                } else {
-                    gEl.className = "value safe";
-                    gasAlertSent = false;
-                }
+let gasAlertSent = false, fireAlertSent = false, timerAlertSent = false;
 
-                // 2. Fetch Fire Alert (V2)
-                const fRes = await fetch(`${apiBase}&v2`);
-                const fireVal = (await fRes.text()).trim();
-                const fEl = document.getElementById('fireStatus');
-                
-                if (fireVal === "1") {
-                    fEl.innerText = "⚠️ FIRE DETECTED";
-                    fEl.className = "status danger";
-                    if (!fireAlertSent) {
-                        sendPush("🔥 FIRE ALERT", "Flame detected in the kitchen!");
-                        fireAlertSent = true;
-                    }
-                } else {
-                    fEl.innerText = "✅ SYSTEM SECURE";
-                    fEl.className = "status safe";
-                    fireAlertSent = false;
-                }
+async function updateDashboard() {
+    // This 'ts' part forces the browser to get fresh data every 3 seconds
+    const cb = `&ts=${Date.now()}`; 
+    try {
+        // 1. Gas Notification (V1)
+        const gRes = await fetch(apiBase + "&v1" + cb);
+        const gVal = parseInt(await gRes.text());
+        if (gVal > 2800 && !gasAlertSent) {
+            sendPush("⚠️ GAS LEAK", `High LPG concentration: ${gVal}`);
+            gasAlertSent = true;
+        } else if (gVal <= 2800) { gasAlertSent = false; }
 
-                // 3. Fetch Timer Finish (V3)
-                const tRes = await fetch(`${apiBase}&v3`);
-                const timerVal = (await tRes.text()).trim();
-                const tEl = document.getElementById('timerStatus');
-                
-                if (timerVal === "1") {
-                    tEl.innerText = "⏰ TIME UP!";
-                    tEl.className = "status danger";
-                    if (!timerAlertSent) {
-                        sendPush("⏰ TIMER FINISHED", "The kitchen timer has reached zero.");
-                        timerAlertSent = true;
-                    }
-                } else {
-                    tEl.innerText = "READY";
-                    tEl.className = "status safe";
-                    timerAlertSent = false;
-                }
+        // 2. Fire Notification (V2)
+        const fRes = await fetch(apiBase + "&v2" + cb);
+        const fVal = (await fRes.text()).trim();
+        if (fVal === "1" && !fireAlertSent) {
+            sendPush("🔥 FIRE ALERT", "Kitchen is vacant and fire detected!");
+            fireAlertSent = true;
+        } else if (fVal === "0") { fireAlertSent = false; }
 
-            } catch (err) {
-                console.log("Sync Error: Check Internet/Token");
-            }
-        }
+        // 3. Timer Notification (V3)
+        const tRes = await fetch(apiBase + "&v3" + cb);
+        const tVal = (await tRes.text()).trim();
+        if (tVal === "1" && !timerAlertSent) {
+            sendPush("⏰ TIMER", "Cooking complete!");
+            timerAlertSent = true;
+        } else if (tVal !== "1") { timerAlertSent = false; }
 
-        function sendPush(title, message) {
-            if (typeof webpushr !== 'undefined') {
-                webpushr('action', 'custom_notification', {
-                    title: title,
-                    message: message,
-                    target_url: window.location.href
-                });
-            }
-        }
+    } catch (err) { console.log("Blynk Connection Error"); }
+}
 
-        setInterval(updateDashboard, 3000); 
-        
-        // Critical for Laptop/Phone Notifications
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').then(function(reg) {
-                console.log('Service Worker Registered');
-            }).catch(function(err) {
-                console.log('Service Worker Failed', err);
-            });
-        }
+function sendPush(title, message) {
+    if (typeof webpushr !== 'undefined') {
+        webpushr('action', 'custom_notification', {
+            title: title,
+            message: message
+        });
+    }
+}
+
+setInterval(updateDashboard, 3000);
+
+// Crucial: This links the sw.js file to your browser
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+}
     </script>
 </body>
 </html>
