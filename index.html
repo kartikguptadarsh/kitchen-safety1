@@ -50,36 +50,39 @@ const apiBase = `https://blr1.blynk.cloud/external/api/get?token=${token}`;
 let gasAlertSent = false, fireAlertSent = false, timerAlertSent = false;
 
 async function updateDashboard() {
-    // This 'ts' part forces the browser to get fresh data every 3 seconds
-    const cb = `&ts=${Date.now()}`; 
+    // The 'ts' forces Blynk to send NEW data, not old saved data
+    const cb = `&ts=${Date.now()}`;
+    
     try {
-        // 1. Gas Notification (V1)
-        const gRes = await fetch(apiBase + "&v1" + cb);
-        const gVal = parseInt(await gRes.text());
-        if (gVal > 2800 && !gasAlertSent) {
-            sendPush("⚠️ GAS LEAK", `High LPG concentration: ${gVal}`);
-            gasAlertSent = true;
-        } else if (gVal <= 2800) { gasAlertSent = false; }
+        // Fetch Gas (V1)
+        const gRes = await fetch(`${apiBase}&v1${cb}`);
+        if (gRes.ok) {
+            const gVal = await gRes.text();
+            document.getElementById('gasDisplay').innerText = gVal.trim();
+        }
 
-        // 2. Fire Notification (V2)
-        const fRes = await fetch(apiBase + "&v2" + cb);
-        const fVal = (await fRes.text()).trim();
-        if (fVal === "1" && !fireAlertSent) {
-            sendPush("🔥 FIRE ALERT", "Kitchen is vacant and fire detected!");
-            fireAlertSent = true;
-        } else if (fVal === "0") { fireAlertSent = false; }
-
-        // 3. Timer Notification (V3)
-        const tRes = await fetch(apiBase + "&v3" + cb);
-        const tVal = (await tRes.text()).trim();
-        if (tVal === "1" && !timerAlertSent) {
-            sendPush("⏰ TIMER", "Cooking complete!");
-            timerAlertSent = true;
-        } else if (tVal !== "1") { timerAlertSent = false; }
-
-    } catch (err) { console.log("Blynk Connection Error"); }
+        // Fetch Fire (V2)
+        const fRes = await fetch(`${apiBase}&v2${cb}`);
+        if (fRes.ok) {
+            const fVal = (await fRes.text()).trim();
+            const fireStatus = document.getElementById('fireStatus');
+            if (fVal === "1") {
+                fireStatus.innerText = "🔥 DANGER";
+                fireStatus.className = "status danger";
+                if (!fireAlertSent) {
+                    sendPush("🔥 FIRE ALERT", "Kitchen vacant and fire detected!");
+                    fireAlertSent = true;
+                }
+            } else {
+                fireStatus.innerText = "SAFE";
+                fireStatus.className = "status safe";
+                fireAlertSent = false;
+            }
+        }
+    } catch (err) {
+        console.error("Connection error:", err);
+    }
 }
-
 function sendPush(title, message) {
     if (typeof webpushr !== 'undefined') {
         webpushr('action', 'custom_notification', {
